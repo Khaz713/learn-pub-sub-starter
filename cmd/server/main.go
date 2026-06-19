@@ -25,6 +25,17 @@ func main() {
 	}
 	defer publishCh.Close()
 
+	_, queue, err := pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.SimpleQueueDurable)
+	if err != nil {
+		log.Fatalf("could not declare peril: %v", err)
+	}
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
+
 	gamelogic.PrintServerHelp()
 	for {
 		input := gamelogic.GetInput()
