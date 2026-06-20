@@ -26,9 +26,15 @@ func main() {
 		log.Fatalf("could not get username: %v", err)
 	}
 
+	publishCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("could not open channel: %v", err)
+	}
+
 	gs := gamelogic.NewGameState(username)
 
-	err = pubsub.SubscribeJSON(conn,
+	err = pubsub.SubscribeJSON( //pause queue
+		conn,
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+username,
 		routing.PauseKey,
@@ -38,20 +44,26 @@ func main() {
 		log.Fatalf("could not declare peril: %v", err)
 	}
 
-	err = pubsub.SubscribeJSON(
+	err = pubsub.SubscribeJSON( //move queue
 		conn,
 		routing.ExchangePerilTopic,
 		routing.ArmyMovesPrefix+"."+username,
 		routing.ArmyMovesPrefix+".*",
 		pubsub.SimpleQueueTransient,
-		handlerMove(gs))
+		handlerMove(gs, publishCh))
 	if err != nil {
 		log.Fatalf("could not declare peril: %v", err)
 	}
 
-	publishCh, err := conn.Channel()
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.SimpleQueueDurable,
+		handlerWar(gs))
 	if err != nil {
-		log.Fatalf("could not open channel: %v", err)
+		log.Fatalf("could not declare peril: %v", err)
 	}
 
 	for {
