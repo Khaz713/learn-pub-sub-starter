@@ -38,6 +38,22 @@ func main() {
 		log.Fatalf("could not declare peril: %v", err)
 	}
 
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.ArmyMovesPrefix+"."+username,
+		routing.ArmyMovesPrefix+".*",
+		pubsub.SimpleQueueTransient,
+		handlerMove(gs))
+	if err != nil {
+		log.Fatalf("could not declare peril: %v", err)
+	}
+
+	publishCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("could not open channel: %v", err)
+	}
+
 	for {
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
@@ -45,13 +61,21 @@ func main() {
 		}
 		switch words[0] {
 		case "move":
-			_, err := gs.CommandMove(words)
+			move, err := gs.CommandMove(words)
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
-
-			// TODO: publish the move
+			err = pubsub.PublishJSON(
+				publishCh,
+				routing.ExchangePerilTopic,
+				routing.ArmyMovesPrefix+"."+username,
+				move)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			fmt.Println("Move published successfully!")
 		case "spawn":
 			err = gs.CommandSpawn(words)
 			if err != nil {
